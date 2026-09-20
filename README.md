@@ -173,13 +173,14 @@ GitHub Actions builds the app, runs JVM tests and lint, and runs a separate emul
 
 ### Verification so far
 
-| Check | Release 1 | Release 2 |
-| --- | --- | --- |
-| Encoder JVM tests | 12 passed | 13 passed |
-| App JVM tests | 4 passed | 9 passed |
-| APK signature | Verified | Verified; same certificate |
-| Android lint at local verification | 0 errors | 0 errors; 8 dependency-update suggestions |
-| Physical printer test | L130/F670L stalls reported | User reports working on L130/F670L |
+| Check | Release 1 | Release 2 | Release 3 |
+| --- | --- | --- | --- |
+| Encoder JVM tests | 12 passed | 13 passed | 13 passed |
+| App JVM tests | 4 passed | 9 passed | 20 passed |
+| Android API 35 rendering tests | Not run locally | 1 passed in subsequent CI | 6 passed in CI |
+| APK signature | Verified | Verified; same certificate | Verified; same certificate |
+| Android lint at local verification | 0 errors | 0 errors; 8 dependency-update suggestions | 0 errors; 8 dependency-update suggestions |
+| Physical printer test | L130/F670L stalls reported | User reports working on L130/F670L | New layouts await a physical check |
 
 The byte fixtures are derived from upstream reference commands, **not captured from a successfully verified L130 print**. Consult [verification results](docs/VERIFICATION.md), the Actions run for the relevant commit, and the [hardware checklist](docs/HARDWARE_VALIDATION.md) before drawing broader conclusions.
 

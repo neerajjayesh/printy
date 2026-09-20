@@ -1,4 +1,57 @@
-# Local verification
+# Verification
+
+## Release 3 — 0.2.0
+
+This build adds page selection and sheet layouts. The ESC/P2 encoder and socket transport are unchanged from Release 2.
+
+| Check | Result |
+| --- | --- |
+| Debug app and instrumentation APKs | Built successfully |
+| Encoder JVM tests | 13 passed |
+| App JVM tests | 20 passed: 11 page-plan tests and 9 transport/profile tests |
+| Android debug lint | 0 errors; 8 dependency-update suggestions (`GradleDependency`) |
+| APK signature | Verified using APK Signature Scheme v2 |
+| Upgrade compatibility | Same application ID and certificate as Releases 1 and 2; version code 3 |
+| Android emulator tests | 6 passed on Android API 35; [CI run](https://github.com/neerajjayesh/printy/actions/runs/35497491214) |
+| Physical printing of new layouts | Requires user testing |
+
+Page-plan tests cover one-based ranges, en dashes, overlaps, invalid/out-of-bounds inputs, odd/even filtering, reverse order before grouping, final blank cells, copies and preserving the spooler's own page subset. Android tests exercise actual `PdfRenderer` output for two-page rotation, four-page clipping, strip boundaries, selected/reversed pages, trailing blanks and grayscale preview, plus the existing single-page strip regression.
+
+All three CI jobs passed for feature commit `cd58cd8503f485e8c33d2f191e894832f7f9d3d8`. The release adds verification documentation only after that run; application, test and build code are unchanged. Both legal notice assets were also verified in the packaged APK.
+
+Local build: Windows, JDK 21, Java/Kotlin target 17, Gradle 8.11.1, AGP 8.9.2, Kotlin 2.1.20, Android SDK 35 / build-tools 35.0.0. Minimum SDK 26, target SDK 35.
+
+```powershell
+.\gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest :escp-encoder:test :app:testDebugUnitTest :app:lintDebug --console=plain --no-daemon
+```
+
+The local run used the checksum-verified Gradle installation under `.tools/gradle-ready/gradle-8.11.1`; `BUILD SUCCESSFUL`, 85 actionable tasks. Log: `.tools/layout-build.log`. Reports are under `app/build/reports` and `escp-encoder/build/reports`.
+
+Release binary: `dist/printy-0.2.0-debug.apk`, 10,559,898 bytes.
+
+SHA-256:
+
+```text
+35dad0b9c39b07a73e4d813113cc92ee347a8850344c25fcbf25a9ae05139963
+```
+
+Signing certificate SHA-256 (same across all three published APKs):
+
+```text
+0adc782c4c2106a7228413ee7e1ca4a0989101ef7e9ec116bfff07d2a8ae1a56
+```
+
+The release download is a debug-signed development build. CI artifacts use their own ephemeral debug signing keys and should not be substituted for an update signed with this certificate. Generated binaries, SDK paths and signing keys are ignored by Git.
+
+### Updated hardware evidence
+
+After the Release 2 connection/footer changes, the owner reports that the app works well on the Epson L130 / Airtel ZTE ZXHN F670L setup. This is a successful user report, not completion of every media, geometry or failure-mode check. Release 3's selection and multi-page layouts still require a physical test. L120/L210 profiles remain unverified on hardware.
+
+The [subsequent Release 2 CI run](https://github.com/neerajjayesh/printy/actions/runs/35495577270) also passed, including the original single-page strip test on Android API 35. This updates the original local-only record below.
+
+## Original Release 2 local verification record
+
+The following records what was known at the time of that local build; see the updated evidence above for later user reports and emulator results.
 
 These checks cover the original local Printy 0.1.1 build produced after investigating the reported L130/Airtel ZTE ZXHN F670L stalls. The APK is preserved as the [Release 2 download](https://github.com/neerajjayesh/printy/releases/tag/v0.1.1). Consult the repository's Actions runs separately for subsequent CI results.
 
