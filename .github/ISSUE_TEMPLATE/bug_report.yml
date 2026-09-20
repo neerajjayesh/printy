@@ -1,0 +1,46 @@
+name: Printing problem
+description: Report a failed, incomplete or incorrectly rendered print.
+title: "[Print issue]: "
+body:
+  - type: markdown
+    attributes:
+      value: "Thank you for testing Printy. Do not post personal documents, Wi-Fi passwords or credentials. Review copied job details and redact your local IP if you prefer."
+  - type: input
+    id: app-version
+    attributes:
+      label: Printy version and Android version
+      placeholder: "Printy 0.1.1, Android 14"
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Exact printer and router / print-server models
+      placeholder: "Epson L130, ZTE ZXHN F670L; firmware versions if known"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps and print settings
+      description: "Test page or document, paper size, color/gray, orientation, copies, and file picker or native Print dialog."
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual result
+      description: "What printed, whether the sheet ejected, printer lights and the status shown in Printy."
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Job details from Release 2 or newer
+      description: "Tap Copy job details on the progress card, then review and paste here."
+      render: text
+  - type: textarea
+    id: sample
+    attributes:
+      label: Optional non-sensitive sample or photo
+      description: "A small reproduction document or a photo of the test page helps. Remove personal information first."

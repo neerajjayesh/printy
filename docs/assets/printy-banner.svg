@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-labelledby="title desc">
+  <title id="title">Printy</title>
+  <desc id="desc">From screen to something real. Free and open source Android printing.</desc>
+  <rect width="1280" height="420" rx="28" fill="#f1f5ed"/>
+  <circle cx="1120" cy="40" r="245" fill="#dce8d7"/>
+  <circle cx="1200" cy="400" r="170" fill="#e5edde"/>
+  <rect x="64" y="59" width="213" height="32" rx="16" fill="#d9e8d8"/>
+  <text x="83" y="80" fill="#28543e" font-family="Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="1.3">FREE &amp; OPEN SOURCE</text>
+  <text x="60" y="208" fill="#153d2d" font-family="Arial, sans-serif" font-size="110" font-weight="700" letter-spacing="-5">Printy</text>
+  <text x="66" y="267" fill="#28543e" font-family="Arial, sans-serif" font-size="30">From screen to something real.</text>
+  <text x="66" y="329" fill="#536657" font-family="Arial, sans-serif" font-size="19">Android printing for the printer you already own.</text>
+  <g transform="translate(875 70)">
+    <rect x="41" y="7" width="178" height="141" rx="9" fill="#fff" stroke="#2c654b" stroke-width="7"/>
+    <path d="M74 46h87M74 70h112M74 94h70" fill="none" stroke="#b7cbbb" stroke-width="8" stroke-linecap="round"/>
+    <rect x="0" y="111" width="260" height="131" rx="28" fill="#2c654b"/>
+    <circle cx="223" cy="144" r="7" fill="#b8dbaa"/>
+    <rect x="43" y="189" width="174" height="118" rx="8" fill="#fff" stroke="#2c654b" stroke-width="7"/>
+    <path d="M73 225h114M73 250h87M73 275h60" fill="none" stroke="#b7cbbb" stroke-width="8" stroke-linecap="round"/>
+  </g>
+</svg>

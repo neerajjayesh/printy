@@ -2,6 +2,8 @@
 package org.printy.app.ui
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
@@ -45,6 +47,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import org.printy.app.data.*
+import org.printy.app.BuildConfig
 import org.printy.app.printing.*
 import org.printy.escp.*
 
@@ -114,7 +117,7 @@ import org.printy.escp.*
         onDelete = { vm.app.printers.remove(it.id); editing = null })
     if (about) AlertDialog(onDismissRequest = { about = false }, icon = { Icon(Icons.Outlined.FavoriteBorder, null) },
         title = { Text("Made for your printer.\nFree for everyone.") },
-        text = { Text("Printy 0.1.0\n\nOpen source under GPLv2 or later. No ads, accounts, analytics or watermarks.\n\nPrinter support is based on Gutenprint by Michael Sweet, Robert Krawitz and contributors.\n\nEarly support: Epson L120, L130 and L210. Start with a test page. A network connection cannot confirm paper, ink or jam status.") },
+        text = { Text("Printy ${BuildConfig.VERSION_NAME}\n\nOpen source under GPLv2 or later. No ads, accounts, analytics or watermarks.\n\nPrinter support is based on Gutenprint by Michael Sweet, Robert Krawitz and contributors.\n\nEarly support: Epson L120, L130 and L210. Start with a test page. A network connection cannot confirm paper, ink or jam status.") },
         confirmButton = { TextButton(onClick = { about = false }) { Text("Close") } },
         dismissButton = { TextButton(onClick = { about = false; showLicense = true }) { Text("License & credits") } })
     if (showLicense) {
@@ -168,7 +171,7 @@ import org.printy.escp.*
                         IconButton(onClick = { onEdit(p) }) { Icon(Icons.Outlined.Edit, "Edit ${p.name}") }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(when (online[p.id]) { true -> "● Reachable"; false -> "○ Offline"; null -> "Checking connection…" }, style = MaterialTheme.typography.labelMedium)
+                        Text(when (online[p.id]) { true -> "● Last check: connected"; false -> "○ Last check: unreachable"; null -> "Connection not checked" }, style = MaterialTheme.typography.labelMedium)
                         Text(if (p.lastUsed == 0L) "Not used yet" else "Used ${DateUtils.getRelativeTimeSpanString(p.lastUsed, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)}",
                             style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -342,7 +345,9 @@ import org.printy.escp.*
 }
 
 @Composable private fun JobCard(job: JobState, onCancel: (String) -> Unit, onDismiss: (String) -> Unit) {
+    val context = LocalContext.current
     var hidden by rememberSaveable(job.id, job.phase) { mutableStateOf(false) }
+    var copied by rememberSaveable(job.id) { mutableStateOf(false) }
     if (hidden) return
     Card(colors = CardDefaults.cardColors(containerColor = if (job.phase == JobPhase.FAILED) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.tertiaryContainer), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -355,6 +360,11 @@ import org.printy.escp.*
                 if (job.total == 0) LinearProgressIndicator(Modifier.fillMaxWidth()) else LinearProgressIndicator(progress = { job.progress }, modifier = Modifier.fillMaxWidth())
                 TextButton(onClick = { onCancel(job.id) }) { Text("Cancel print") }
             }
+            if (job.details.isNotEmpty()) TextButton(onClick = {
+                context.getSystemService(ClipboardManager::class.java)
+                    .setPrimaryClip(ClipData.newPlainText("Printy job details", job.details))
+                copied = true
+            }) { Text(if (copied) "Details copied" else "Copy job details") }
         }
     }
 }

@@ -47,7 +47,7 @@ class TransportTest {
         val executor = Executors.newSingleThreadExecutor()
         try { ServerSocket(0).use { server ->
             server.receiveBufferSize = 1024
-            RawTransport(idleTimeoutMs = 300).use { transport ->
+            RawTransport(writeTimeoutMs = 300).use { transport ->
                 val output = transport.connect("127.0.0.1", server.localPort)
                 server.accept().use { peer ->
                     peer.receiveBufferSize = 1024
@@ -59,5 +59,96 @@ class TransportTest {
                 }
             }
         } } finally { executor.shutdownNow() }
+    }
+
+    @Test(timeout = 15000) fun drainsRepliesWhileSendingAndDeliversFooterBeforeEof() {
+        val executor = Executors.newSingleThreadExecutor()
+        val body = ByteArray(512 * 1024) { (it % 251).toByte() }
+        val footer = byteArrayOf(12, 27, 64)
+        val reply = ByteArray(512 * 1024) { 65 }
+        try { ServerSocket(0).use { server ->
+            // A bidirectional bridge can write replies before it consumes more print data.
+            val received = executor.submit<ByteArray> { server.accept().use { peer ->
+                peer.soTimeout = 5000; peer.sendBufferSize = 8192
+                peer.getOutputStream().write(reply)
+                peer.getInputStream().readBytes()
+            } }
+            RawTransport(writeTimeoutMs = 5000).use { transport ->
+                val output = java.io.BufferedOutputStream(transport.connect("127.0.0.1", server.localPort))
+                output.write(body); output.write(footer); output.flush()
+                assertEquals(RawTransport.FinishResult.SERVER_CLOSED, transport.finish(5000))
+                assertArrayEquals(body + footer, received.get(5, TimeUnit.SECONDS))
+                assertEquals((body.size + footer.size).toLong(), transport.bytesWritten)
+                assertEquals(reply.size.toLong(), transport.bytesReceived)
+            }
+        } } finally { executor.shutdownNow() }
+    }
+
+    @Test(timeout = 10000) fun finishWaitsForServerToCloseAfterOutputEof() {
+        val executor = Executors.newFixedThreadPool(2)
+        val receivedEof = CountDownLatch(1)
+        val releaseServer = CountDownLatch(1)
+        try { ServerSocket(0).use { server ->
+            val peerTask = executor.submit { server.accept().use { peer ->
+                peer.soTimeout = 5000
+                assertArrayEquals(byteArrayOf(12), peer.getInputStream().readBytes())
+                receivedEof.countDown()
+                assertTrue(releaseServer.await(5, TimeUnit.SECONDS))
+                peer.getOutputStream().write(byteArrayOf(65, 66))
+            } }
+            RawTransport().use { transport ->
+                transport.connect("127.0.0.1", server.localPort).write(12)
+                val finishing = executor.submit<RawTransport.FinishResult> { transport.finish(5000) }
+                assertTrue(receivedEof.await(3, TimeUnit.SECONDS))
+                assertFalse("Do not finish while the server is still draining", finishing.isDone)
+                releaseServer.countDown()
+                assertEquals(RawTransport.FinishResult.SERVER_CLOSED, finishing.get(3, TimeUnit.SECONDS))
+                peerTask.get(3, TimeUnit.SECONDS)
+                assertEquals(2L, transport.bytesReceived)
+            }
+        } } finally { releaseServer.countDown(); executor.shutdownNow() }
+    }
+
+    @Test(timeout = 5000) fun finishIsBoundedWhenAQuietServerKeepsItsSideOpen() {
+        ServerSocket(0).use { server -> RawTransport().use { transport ->
+            transport.connect("127.0.0.1", server.localPort).write(12)
+            server.accept().use { peer ->
+                assertEquals(RawTransport.FinishResult.WAIT_EXPIRED, transport.finish(100))
+                peer.soTimeout = 1000
+                assertArrayEquals(byteArrayOf(12), peer.getInputStream().readBytes())
+            }
+        } }
+    }
+
+    @Test(timeout = 5000) fun cancellationClosesAConnectionWaitingForServerEof() {
+        val executor = Executors.newSingleThreadExecutor()
+        try { ServerSocket(0).use { server -> RawTransport().use { transport ->
+            transport.connect("127.0.0.1", server.localPort).write(12)
+            server.accept().use { peer ->
+                peer.soTimeout = 1000
+                val finishing = executor.submit<Boolean> {
+                    try { transport.finish(60000); false } catch (_: java.io.IOException) { true }
+                }
+                assertArrayEquals(byteArrayOf(12), peer.getInputStream().readBytes())
+                transport.close()
+                assertTrue(finishing.get(2, TimeUnit.SECONDS))
+            }
+        } } } finally { executor.shutdownNow() }
+    }
+
+    @Test(timeout = 5000) fun serverResetDuringFinishIsNotReportedAsSent() {
+        val executor = Executors.newSingleThreadExecutor()
+        try { ServerSocket(0).use { server -> RawTransport().use { transport ->
+            transport.connect("127.0.0.1", server.localPort).write(12)
+            server.accept().use { peer ->
+                peer.soTimeout = 1000
+                val finishing = executor.submit<Boolean> {
+                    try { transport.finish(3000); false } catch (_: java.io.IOException) { true }
+                }
+                assertArrayEquals(byteArrayOf(12), peer.getInputStream().readBytes())
+                peer.setSoLinger(true, 0); peer.close()
+                assertTrue(finishing.get(2, TimeUnit.SECONDS))
+            }
+        } } } finally { executor.shutdownNow() }
     }
 }

@@ -107,14 +107,19 @@ object Documents {
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; textSize = 40f; typeface = Typeface.DEFAULT_BOLD }
             c.drawText("Hello from Printy.", 48f, 100f, paint)
             paint.typeface = Typeface.DEFAULT; paint.textSize = 16f
-            c.drawText("A little page. A working connection.", 48f, 137f, paint)
+            c.drawText("A test for your printer and connection.", 48f, 137f, paint)
             c.drawText("Check that all four colors line up below.", 48f, 167f, paint)
             listOf(Color.BLACK, Color.CYAN, Color.MAGENTA, Color.YELLOW).forEachIndexed { i, color ->
                 paint.color = color; c.drawRect(48f + i * 125, 220f, 148f + i * 125, 300f, paint)
             }
             paint.color = Color.BLACK; paint.textSize = 14f
             c.drawText("Made for your printer. Free for everyone.", 48f, 380f, paint)
-            c.drawText("If this looks right, you're ready to print.", 48f, 408f, paint)
+            c.drawText("The page should come all the way out when finished.", 48f, 408f, paint)
+            paint.color = Color.LTGRAY; paint.strokeWidth = 1f
+            c.drawLine(48f, 735f, 547f, 735f, paint)
+            paint.color = Color.BLACK
+            c.drawText("BOTTOM OF TEST PAGE", 48f, 763f, paint)
+            c.drawText("Check this line, then check that the sheet comes out.", 48f, 788f, paint)
             pdf.finishPage(page); file.outputStream().use(pdf::writeTo)
         }
         return LocalDocument(file, "Printy test page", 1)

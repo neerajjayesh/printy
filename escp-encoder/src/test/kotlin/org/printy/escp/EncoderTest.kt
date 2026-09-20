@@ -36,9 +36,25 @@ class EncoderTest {
         EscpEncoder(output).raster(2, listOf(hex("c0 00")))
         assertContentEquals(hex("1b 69 02 01 02 02 00 01 00 01 c0 00 0d"), output.toByteArray())
     }
-    @Test fun `footer resets and leaves remote mode`() {
+    @Test fun `footer restores NVRAM before model 80 job end and leaves remote mode`() {
         val output = ByteArrayOutputStream(); EscpEncoder(output).endJob()
-        assertContentEquals(hex("1b 40 1b 28 52 08 00 00 52 45 4d 4f 54 45 31 4a 45 01 00 00 4c 44 00 00 1b 00 00 00"), output.toByteArray())
+        assertContentEquals(hex("1b 40 1b 28 52 08 00 00 52 45 4d 4f 54 45 31 4c 44 00 00 4a 45 01 00 00 1b 00 00 00"), output.toByteArray())
+    }
+    @Test fun `a full job ejects the sheet before reset and LD JE footer`() {
+        val spec = PageSpec(Paper.A4, EpsonModel.byId("l130"), grayscale = true)
+        val source = object : RasterSource {
+            override val width = spec.width; override val height = spec.height
+            override fun readRow(y: Int, argb: IntArray) {
+                argb.fill(-1)
+                // Content both halfway down and near the bottom must be followed by FF.
+                if (y == height / 2 || y == height - 100) argb[0] = 0xff000000.toInt()
+            }
+        }
+        val output = ByteArrayOutputStream()
+        val encoder = EscpEncoder(output)
+        encoder.beginJob(); encoder.page(source, spec); encoder.endJob()
+        val ending = hex("0c 1b 40 1b 28 52 08 00 00 52 45 4d 4f 54 45 31 4c 44 00 00 4a 45 01 00 00 1b 00 00 00")
+        assertContentEquals(ending, output.toByteArray().takeLast(ending.size).toByteArray())
     }
     @Test fun `PackBits reference literal repeat and 128 byte boundaries`() {
         assertContentEquals(hex("fe aa 01 80 00 fd 55"), PackBits.encode(hex("aa aa aa 80 00 55 55 55 55")))

@@ -10,16 +10,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.printy.app.BuildConfig
 import org.printy.app.data.PrinterProfile
 import org.printy.app.data.PrinterStore
 import org.printy.escp.*
 import java.io.BufferedOutputStream
-import java.io.Closeable
 import java.util.concurrent.ConcurrentHashMap
 
 enum class JobPhase { QUEUED, SENDING, SENT, FAILED, CANCELED }
 data class JobState(val id: String, val title: String, val printer: String, val phase: JobPhase,
-    val message: String, val page: Int = 0, val total: Int = 0, val progress: Float = 0f) {
+    val message: String, val page: Int = 0, val total: Int = 0, val progress: Float = 0f,
+    val details: String = "") {
     val active get() = phase == JobPhase.QUEUED || phase == JobPhase.SENDING
 }
 
@@ -31,12 +32,20 @@ class JobController(private val context: Context, private val printers: PrinterS
     val states = mutable.asStateFlow()
     val notifications = JobNotifications(context)
     private class Handle(val cancelInput: () -> Unit) {
-        @Volatile var transport: Closeable? = null
+        @Volatile var transport: RawTransport? = null
+        @Volatile var footerSent = false
+        @Volatile var finishResult = "Not started"
         lateinit var job: Job
     }
+    // A raw endpoint can still be physically printing after accepting the whole stream.
+    // Stop opening automatic probe connections to an endpoint once a job has used it.
+    private val attemptedEndpoints = mutableSetOf<String>()
+    private val reachability = mutableMapOf<String, Boolean>()
     fun contains(id: String) = handles.containsKey(id)
     suspend fun reachable(printer: PrinterProfile): Boolean = queue.withLock {
+        if (printer.endpoint in attemptedEndpoints) return@withLock reachability[printer.endpoint] ?: true
         withContext(Dispatchers.IO) { RawTransport.reachable(printer.host, printer.port) }
+            .also { reachability[printer.endpoint] = it }
     }
     fun dismiss(id: String) { mutable.update { list -> list.filterNot { it.id == id && !it.active } }; notifications.dismiss(id) }
     fun cancel(id: String) {
@@ -60,6 +69,27 @@ class JobController(private val context: Context, private val printers: PrinterS
         handle.job = scope.launch(start = CoroutineStart.LAZY) {
             var owned: LocalDocument? = null
             var terminal: JobState = initial
+            val startedAt = System.nanoTime()
+            fun details(state: JobState) = buildString {
+                appendLine("Printy ${BuildConfig.VERSION_NAME}")
+                appendLine("Model: ${printer.modelId}; endpoint: ${printer.endpoint}")
+                appendLine("State: ${state.phase}; ${state.message}")
+                appendLine("Page: ${state.page}/${state.total}; elapsed: ${(System.nanoTime() - startedAt) / 1_000_000_000}s")
+                appendLine("Bytes written: ${handle.transport?.bytesWritten ?: 0}")
+                appendLine("Reply bytes read: ${handle.transport?.bytesReceived ?: 0}")
+                appendLine("Page/job ending flushed: ${handle.footerSent}")
+                appendLine("Connection finish: ${handle.finishResult}")
+                append("These details cannot confirm physical printing or paper ejection.")
+            }
+            val monitor = launch {
+                while (isActive) {
+                    delay(1000)
+                    mutable.value.find { it.id == id }?.let { state ->
+                        val updated = state.copy(details = details(state))
+                        publish(updated); onProgress(updated)
+                    }
+                }
+            }
             try {
                 queue.withLock {
                     ensureActive()
@@ -69,6 +99,7 @@ class JobController(private val context: Context, private val printers: PrinterS
                     owned = prepare()
                     val document = requireNotNull(owned)
                     val total = document.pages * settings.copies
+                    attemptedEndpoints.add(printer.endpoint)
                     val jobContext = currentCoroutineContext()
                     val power = context.getSystemService(PowerManager::class.java)
                     val wake = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Printy:printing")
@@ -84,6 +115,7 @@ class JobController(private val context: Context, private val printers: PrinterS
                                 handle.transport = transport
                                 ensureActive()
                                 val output = BufferedOutputStream(transport.connect(printer.host, printer.port), 32 * 1024)
+                                withContext(Dispatchers.Main) { reachability[printer.endpoint] = true }
                                 val encoder = EscpEncoder(output)
                                 val spec = PageSpec(settings.paper, EpsonModel.byId(printer.modelId), settings.grayscale)
                                 encoder.beginJob()
@@ -105,7 +137,14 @@ class JobController(private val context: Context, private val printers: PrinterS
                                     }
                                 }
                                 encoder.endJob()
-                                // Socket acceptance is the only acknowledgment available from many USB routers.
+                                handle.footerSent = true
+                                handle.finishResult = "Waiting for server"
+                                val finishing = initial.copy(phase = JobPhase.SENDING, page = total, total = total,
+                                    progress = 1f, message = "Finishing the connection. Waiting for the print server…")
+                                withContext(Dispatchers.Main) { publish(finishing); onProgress(finishing) }
+                                handle.finishResult = transport.finish().name
+                                ensureActive()
+                                // EOF or a bounded wait is not an acknowledgment of physical printing.
                             }
                         }
                     } finally { if (wake.isHeld) wake.release() }
@@ -115,14 +154,22 @@ class JobController(private val context: Context, private val printers: PrinterS
             } catch (_: CancellationException) {
                 terminal = initial.copy(phase = JobPhase.CANCELED, message = "Printing canceled. Pages already sent may still print.")
             } catch (e: Exception) {
+                if (handle.transport?.bytesWritten == 0L) reachability[printer.endpoint] = false
                 terminal = initial.copy(phase = JobPhase.FAILED, message = PrintErrors.message(e, printer.endpoint))
             } catch (e: OutOfMemoryError) {
                 terminal = initial.copy(phase = JobPhase.FAILED, message = PrintErrors.message(e))
             } finally {
+                monitor.cancel()
                 handle.transport?.close(); runCatching(cancelInput)
                 owned?.file?.delete()
                 handles.remove(id)
-                withContext(NonCancellable + Dispatchers.Main) { publish(terminal); onFinished(terminal) }
+                withContext(NonCancellable + Dispatchers.Main) {
+                    val last = mutable.value.find { it.id == id }
+                    if (terminal.phase != JobPhase.SENT && last != null)
+                        terminal = terminal.copy(page = last.page, total = last.total, progress = last.progress)
+                    terminal = terminal.copy(details = details(terminal))
+                    publish(terminal); onFinished(terminal)
+                }
             }
         }
         handle.job.start()

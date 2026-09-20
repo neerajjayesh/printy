@@ -92,7 +92,8 @@ class EscpEncoder(private val out: OutputStream) {
     }
     fun endJob() {
         bytes(27, 64)
-        remote(byteArrayOf(74, 69, 1, 0, 0, 76, 68, 0, 0)) // JE; restore NVRAM (LD)
+        // Gutenprint restores NVRAM first, then sends the model's postinit JE sequence.
+        remote(byteArrayOf(76, 68, 0, 0, 74, 69, 1, 0, 0)) // LD; JE
         out.flush()
     }
 }
