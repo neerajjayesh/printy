@@ -23,10 +23,6 @@ import java.io.InputStream
 inline fun <T> PdfDocument.useDocument(block: (PdfDocument) -> T): T = try { block(this) } finally { close() }
 
 data class LocalDocument(val file: File, val name: String, val pages: Int)
-data class PrintSettings(val paper: Paper = Paper.A4, val copies: Int = 1,
-    val grayscale: Boolean = false, val landscape: Boolean = false, val systemLayout: Boolean = false) {
-    init { require(copies in 1..99) }
-}
 
 object Documents {
     private fun temp(context: Context, suffix: String): File {
@@ -127,14 +123,15 @@ object Documents {
 
     /** Same geometry for preview and printing. System PDFs already contain page margins. */
     private fun transform(page: PdfRenderer.Page, spec: PageSpec, settings: PrintSettings,
-        scale: Float = 1f, stripY: Int = 0, includeMargins: Boolean = false): Matrix {
+        scale: Float = 1f, stripY: Int = 0, includeMargins: Boolean = false, cell: RectF? = null): Matrix {
         val w = (if (settings.systemLayout) spec.sheetWidth else spec.width).toFloat()
         val h = (if (settings.systemLayout) spec.sheetHeight else spec.height).toFloat()
         val logicalW = if (settings.landscape) h else w
         val logicalH = if (settings.landscape) w else h
-        val s = minOf(logicalW / page.width, logicalH / page.height)
-        val dx = (logicalW - page.width * s) / 2
-        val dy = (logicalH - page.height * s) / 2
+        val bounds = cell ?: RectF(0f, 0f, logicalW, logicalH)
+        val s = minOf(bounds.width() / page.width, bounds.height() / page.height)
+        val dx = bounds.left + (bounds.width() - page.width * s) / 2
+        val dy = bounds.top + (bounds.height() - page.height * s) / 2
         val inset = (if (settings.systemLayout) -spec.margin else 0) + (if (includeMargins) spec.margin else 0)
         val values = if (settings.landscape) floatArrayOf(0f, -s, w - dy + inset, s, 0f, dx + inset, 0f, 0f, 1f)
             else floatArrayOf(s, 0f, dx + inset, 0f, s, dy + inset, 0f, 0f, 1f)
@@ -160,14 +157,83 @@ object Documents {
         }
         override fun close() = strip.recycle()
     }
-    suspend fun preview(document: LocalDocument, index: Int, settings: PrintSettings): Bitmap = withContext(Dispatchers.IO) {
-        renderer(document.file).use { pdf -> pdf.openPage(index).use { page ->
+
+    private fun cells(spec: PageSpec, settings: PrintSettings): List<RectF> {
+        val w = (if (settings.landscape) spec.height else spec.width).toFloat()
+        val h = (if (settings.landscape) spec.width else spec.height).toFloat()
+        val gap = spec.margin * 2f / 3f // 1/12 inch between adjacent pages.
+        val cw = (w - gap * (settings.layout.columns - 1)) / settings.layout.columns
+        val ch = (h - gap * (settings.layout.rows - 1)) / settings.layout.rows
+        return List(settings.layout.capacity) { i ->
+            val left = (i % settings.layout.columns) * (cw + gap)
+            val top = (i / settings.layout.columns) * (ch + gap)
+            RectF(left, top, left + cw, top + ch)
+        }
+    }
+
+    /** Each PDF owns only one open Page at a time. Clip each cell so rendering cannot erase its neighbor. */
+    private fun renderSheet(pdf: PdfRenderer, sheet: OutputSheet, bitmap: Bitmap, spec: PageSpec,
+        settings: PrintSettings, scale: Float = 1f, stripY: Int = 0, includeMargins: Boolean = false,
+        mode: Int = PdfRenderer.Page.RENDER_MODE_FOR_PRINT) {
+        require(sheet.pages.size == settings.layout.capacity)
+        if (settings.layout == SheetLayout.ONE) {
+            sheet.pages.single()?.let { index -> pdf.openPage(index).use { page ->
+                page.render(bitmap, null, transform(page, spec, settings, scale, stripY, includeMargins), mode)
+            } }
+            return
+        }
+        val inset = if (includeMargins) spec.margin.toFloat() else 0f
+        val cells = cells(spec, settings)
+        sheet.pages.forEachIndexed { slot, index ->
+            if (index != null) {
+                val cell = cells[slot]
+                val physical = if (settings.landscape)
+                    RectF(spec.width - cell.bottom, cell.left, spec.width - cell.top, cell.right)
+                else RectF(cell)
+                val clip = Rect(
+                    kotlin.math.ceil((physical.left + inset) * scale).toInt(),
+                    kotlin.math.ceil((physical.top + inset) * scale).toInt() - stripY,
+                    kotlin.math.floor((physical.right + inset) * scale).toInt(),
+                    kotlin.math.floor((physical.bottom + inset) * scale).toInt() - stripY)
+                if (clip.intersect(0, 0, bitmap.width, bitmap.height)) {
+                    pdf.openPage(index).use { page ->
+                        page.render(bitmap, clip, transform(page, spec, settings, scale, stripY, includeMargins, cell), mode)
+                    }
+                }
+            }
+        }
+    }
+
+    /** A composed output sheet, still rendered in bounded 128-row strips. The caller owns pdf. */
+    class SheetRaster(private val pdf: PdfRenderer, private val sheet: OutputSheet, private val spec: PageSpec,
+        private val settings: PrintSettings) : RasterSource, Closeable {
+        override val width = spec.width
+        override val height = spec.height
+        private val strip = createBitmap(width, minOf(128, height), Bitmap.Config.ARGB_8888)
+        private var stripStart = -1
+        override fun readRow(y: Int, argb: IntArray) {
+            require(y in 0 until height)
+            val start = y / strip.height * strip.height
+            if (stripStart != start) {
+                strip.eraseColor(Color.WHITE)
+                renderSheet(pdf, sheet, strip, spec, settings, stripY = start)
+                stripStart = start
+            }
+            strip.getPixels(argb, 0, width, 0, y - stripStart, width, 1)
+        }
+        override fun close() = strip.recycle()
+    }
+
+    suspend fun preview(document: LocalDocument, sheet: OutputSheet, settings: PrintSettings): Bitmap = withContext(Dispatchers.IO) {
+        renderer(document.file).use { pdf ->
             val spec = PageSpec(settings.paper, EpsonModel.supported.first(), settings.grayscale)
             val scale = 720f / spec.sheetWidth
             val bitmap = createBitmap(720, (spec.sheetHeight * scale).toInt(), Bitmap.Config.ARGB_8888)
             bitmap.eraseColor(Color.WHITE)
             try {
-                page.render(bitmap, null, transform(page, spec, settings, scale, includeMargins = true), PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                renderSheet(pdf, sheet, bitmap, spec, settings, scale, includeMargins = true,
+                    mode = PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                currentCoroutineContext().ensureActive()
                 if (settings.grayscale) {
                     val paint = Paint().apply { colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) }) }
                     // Drawing a bitmap onto itself is undefined; use a separate bounded preview copy.
@@ -180,6 +246,6 @@ object Documents {
                     rotated
                 } else bitmap
             } catch (e: Throwable) { bitmap.recycle(); throw e }
-        } }
+        }
     }
 }

@@ -23,7 +23,11 @@ class DirectPrintService : Service() {
         startForeground(100, app.jobs.notifications.build(state))
         active.add(id)
         val settings = PrintSettings(Paper.valueOf(intent.getStringExtra("paper") ?: "A4"),
-            intent.getIntExtra("copies", 1), intent.getBooleanExtra("gray", false), intent.getBooleanExtra("landscape", false))
+            intent.getIntExtra("copies", 1), intent.getBooleanExtra("gray", false), intent.getBooleanExtra("landscape", false),
+            selection = PageSelection.valueOf(intent.getStringExtra("selection") ?: "ALL"),
+            pageRange = intent.getStringExtra("pageRange") ?: "",
+            layout = SheetLayout.valueOf(intent.getStringExtra("layout") ?: "ONE"),
+            reverse = intent.getBooleanExtra("reverse", false))
         val path = intent.getStringExtra("file")
         app.jobs.submit(id, title, printer, settings, prepare = {
             withContext(Dispatchers.IO) {

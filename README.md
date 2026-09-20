@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/neerajjayesh/printy/releases/tag/v0.1.1"><img alt="Release 2 · v0.1.1" src="https://img.shields.io/badge/Release_2-v0.1.1-24634C?style=flat-square"></a>
+  <a href="https://github.com/neerajjayesh/printy/releases/tag/v0.2.0"><img alt="Release 3 · v0.2.0" src="https://img.shields.io/badge/Release_3-v0.2.0-24634C?style=flat-square"></a>
   <img alt="Android 8.0 and newer" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white">
   <img alt="Kotlin and Jetpack Compose" src="https://img.shields.io/badge/Kotlin-Jetpack_Compose-7F52FF?style=flat-square&logo=kotlin&logoColor=white">
   <a href="LICENSE"><img alt="GPL v2 or later" src="https://img.shields.io/badge/License-GPL--2.0--or--later-blue?style=flat-square"></a>
@@ -14,7 +14,7 @@
 Free, open-source Android printing for Epson inkjets connected to a router's USB print server.</p>
 
 <p align="center">
-  <a href="https://github.com/neerajjayesh/printy/releases/tag/v0.1.1"><strong>Download Release 2</strong></a> ·
+  <a href="https://github.com/neerajjayesh/printy/releases/tag/v0.2.0"><strong>Download Release 3</strong></a> ·
   <a href="#get-started">Get started</a> ·
   <a href="#build-it-yourself">Build from source</a> ·
   <a href="docs/HARDWARE_VALIDATION.md">Hardware testing</a>
@@ -27,16 +27,17 @@ Printy lets Android send documents and photos to a USB printer through a compati
 No accounts. No ads. No analytics. No watermarks. No paid unlocks.
 
 > [!IMPORTANT]
-> **Early, experimental software.** Release 1 printed on an Epson L130 through an Airtel ZTE ZXHN F670L, but the sheet did not eject and longer documents stopped partway through. Release 2 addresses transport and job-ending issues identified during that investigation. **Successful printing with Release 2 on that setup is still awaiting confirmation.** Software tests do not establish printer compatibility.
+> **Early, experimental software.** The owner now reports successful printing with Release 2 on an **Epson L130 through an Airtel ZTE ZXHN F670L**. Release 3 adds page selection and layouts while retaining that transport and encoder. The new layouts still need a physical print check; L120/L210 remain unverified on hardware. Software tests do not establish universal printer compatibility.
 
 ## Downloads
 
 | Release | Version | What it contains | Status |
 | --- | --- | --- | --- |
-| **[Release 2](https://github.com/neerajjayesh/printy/releases/tag/v0.1.1)** | `0.1.1` | Improved connection completion, corrected footer, copyable job details, bottom-of-page test marker | Current experimental build |
+| **[Release 3](https://github.com/neerajjayesh/printy/releases/tag/v0.2.0)** | `0.2.0` | Page ranges, odd/even selection, reverse order, 1/2/4 pages per sheet and sheet previews | Current experimental build |
+| [Release 2](https://github.com/neerajjayesh/printy/releases/tag/v0.1.1) | `0.1.1` | Improved connection completion, corrected footer, copyable job details, bottom-of-page test marker | User reports working on L130/F670L |
 | [Release 1](https://github.com/neerajjayesh/printy/releases/tag/v0.1.0) | `0.1.0` | Initial Android app, Print Service and standalone ESC/P2 encoder | Historical build with reported stalls |
 
-Each release includes its original **APK**, a **SHA-256 checksum**, and a tagged source snapshot. These APKs are **debug-signed development builds**, not production-signed store releases. Release 2 uses the same certificate and application ID as Release 1 and can be installed over it to preserve saved printers.
+Each release includes an **APK**, a **SHA-256 checksum**, and a tagged source snapshot. These APKs are **debug-signed development builds**, not production-signed store releases. The three downloads use the same certificate and application ID, so updates preserve saved printers.
 
 See the [changelog](CHANGELOG.md) and [verification notes](docs/VERIFICATION.md) for the differences and completed checks.
 
@@ -47,6 +48,8 @@ See the [changelog](CHANGELOG.md) and [verification notes](docs/VERIFICATION.md)
 | Print from other apps | Native Android Print Service and saved-printer discovery |
 | Print a PDF or photo | System file picker, page preview and Gallery share-sheet support |
 | Set basic options | 1–99 copies, color or grayscale, portrait or landscape |
+| Choose pages | All pages, custom lists/ranges such as `1, 3–5`, odd/even pages and reverse order |
+| Save paper | 1, 2 side by side, or 4 pages per sheet, with a preview of the assembled sheet |
 | Choose paper | A4, Letter and 4 × 6 inches, with a white margin |
 | Save several printers | Name, numeric IPv4/IPv6 address, port, exact model and last-used time |
 | Check a new setup | Three-step onboarding and a one-page test print |
@@ -66,9 +69,13 @@ You need:
 
 Printy cannot add printer-sharing support to router firmware that lacks it. A reachable TCP port also cannot establish whether paper, ink or the attached printer is ready. The current protocol does not provide reliable jam/ink reporting through generic USB routers.
 
+### Why choose a printer model?
+
+The model selects the command format and physical ink-head geometry. A router's raw port forwards bytes; it does not translate them into a universal printer language. Removing the selector would not make other Epson models or other brands compatible. Model detection could simplify setup where a server exposes that information. A future [IPP Everywhere](https://www.pwg.org/ipp/everywhere.html) backend could support driverless printers across brands, alongside the existing Epson backend.
+
 ## Get started
 
-1. Download the APK from **[Release 2](https://github.com/neerajjayesh/printy/releases/tag/v0.1.1)** and install it on your Android device.
+1. Download the APK from **[Release 3](https://github.com/neerajjayesh/printy/releases/tag/v0.2.0)** and install it on your Android device.
 2. Connect the printer to your router's USB port and enable printer sharing in the router's settings.
 3. Open Printy. Enter the router's local IP address, select the **exact printer model**, and use port **9100** unless your print server specifies another port.
 4. Load plain A4 paper and send **one test page**. Check the text, four colors, bottom marker and complete sheet ejection before printing a document.
@@ -76,6 +83,17 @@ Printy cannot add printer-sharing support to router firmware that lacks it. A re
 6. Or tap **Print a file** in Printy, choose a PDF/photo, review the pages, set options and print.
 
 The original test page placed all text in the top half of the sheet. Release 2 adds a marker near the bottom to distinguish complete raster output from a sheet that fails to eject.
+
+### Choose pages and fit two on a sheet
+
+In **Print a file**, open a PDF and scroll to the options:
+
+1. Under **Pages to print**, keep **All pages**, choose odd/even pages, or choose **Choose pages** and enter a list such as `1, 3–5`. Numbers refer to the original PDF, starting at 1. Overlapping ranges print each page once, in document order.
+2. Set **Layout → 2 pages side by side**. Printy selects landscape automatically; orientation remains adjustable. Choose **4 pages per sheet** for a grid.
+3. Use the preview arrows to review each output sheet. Pages go across, then down; the final unused spaces stay white. **Reverse page order** reverses the selected pages before grouping.
+4. Choose copies, paper and color, then tap **Print … sheets**. Copies are collated; progress counts physical sheets.
+
+These layout controls are in Printy's own file preview. Android's native print dialog keeps its own page controls, and Printy honors the PDF subset supplied by the spooler. This release provides single-sided layouts, without booklet reordering or automatic duplex printing.
 
 ### If a job stops partway through
 
@@ -95,7 +113,7 @@ The original test page placed all text in the top half of the sheet. Release 2 a
 - Adds copyable byte counts, elapsed time, footer-flush state and connection-ending details. Reply payloads and document contents are not recorded in those details.
 - Adds a bottom-of-page marker and regression tests for connection completion, cancellation and reset behavior.
 
-These are candidate fixes for the reported L130/F670L issue. Their physical effect is not yet verified.
+The owner subsequently reported that the app works well on the L130/F670L setup. Detailed geometry, media and failure-mode checks remain in the hardware checklist.
 
 ## How it works
 
@@ -115,7 +133,7 @@ flowchart LR
 
 ### Android app · `app`
 
-The app owns profile storage, document import, previews, services, progress, notifications and transport. Android's `PdfRenderer` renders at **360 DPI in 128-row strips**, avoiding a full-resolution page bitmap. Photo import handles EXIF orientation and bounds decoded image dimensions.
+The app owns profile storage, document import, previews, services, progress, notifications and transport. `PrintPlan` validates page ranges and groups source pages into output sheets before the socket is opened. Android's `PdfRenderer` renders at **360 DPI in 128-row strips**, avoiding a full-resolution page bitmap. Each layout cell is clipped independently; preview and print use the same fit/rotation transforms. Photo import handles EXIF orientation and bounds decoded image dimensions.
 
 Native Android jobs receive the PDF page subset supplied by the spooler; Printy does not apply the original page indices a second time. Native print margins are preserved without an extra inset. Landscape rotates content while the physical paper feeds short-edge first.
 
@@ -151,7 +169,7 @@ Run PDF strip-rendering tests with a connected device or emulator:
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-GitHub Actions builds the app, runs JVM tests and lint, and runs a separate emulator job. CI build artifacts are newly built debug APKs; their signing keys can differ from the APKs attached to the two releases. Keep your release signing key private and stable when producing future updates.
+GitHub Actions builds the app, runs JVM tests and lint, and runs a separate emulator job. CI build artifacts are newly built debug APKs; their signing keys can differ from the APKs attached to releases. Keep your release signing key private and stable when producing future updates.
 
 ### Verification so far
 
@@ -161,7 +179,7 @@ GitHub Actions builds the app, runs JVM tests and lint, and runs a separate emul
 | App JVM tests | 4 passed | 9 passed |
 | APK signature | Verified | Verified; same certificate |
 | Android lint at local verification | 0 errors | 0 errors; 8 dependency-update suggestions |
-| Physical printer test | L130/F670L stalls reported | Awaiting user confirmation |
+| Physical printer test | L130/F670L stalls reported | User reports working on L130/F670L |
 
 The byte fixtures are derived from upstream reference commands, **not captured from a successfully verified L130 print**. Consult [verification results](docs/VERIFICATION.md), the Actions run for the relevant commit, and the [hardware checklist](docs/HARDWARE_VALIDATION.md) before drawing broader conclusions.
 
@@ -185,7 +203,10 @@ To add another Epson model:
 
 ## Roadmap
 
-- [ ] Confirm reliable L130/F670L printing and validate L120/L210 on real hardware.
+- [x] Receive a successful L130/F670L user report following the connection fix.
+- [x] Page selection and 1/2/4 pages per sheet in Printy's preview.
+- [ ] Complete detailed layout/media acceptance tests and validate L120/L210 on real hardware.
+- [ ] IPP Everywhere backend for compatible driverless printers across brands.
 - [ ] mDNS discovery where print servers advertise compatible endpoints.
 - [ ] LPR transport with configurable queue names.
 - [ ] Verified borderless photo profiles and calibrated color/media settings.

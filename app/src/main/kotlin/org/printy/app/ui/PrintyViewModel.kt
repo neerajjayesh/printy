@@ -31,7 +31,11 @@ class PrintyViewModel(application: Application) : AndroidViewModel(application) 
         importJob?.cancel()
         importJob = viewModelScope.launch {
             importing.value = true; error.value = null
-            try { document.value = Documents.import(app, uri) }
+            try {
+                val imported = Documents.import(app, uri)
+                settings.value = settings.value.copy(selection = PageSelection.ALL, pageRange = "", reverse = false)
+                document.value = imported
+            }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { error.value = PrintErrors.message(e) }
             catch (e: OutOfMemoryError) { error.value = PrintErrors.message(e) }
@@ -48,11 +52,17 @@ class PrintyViewModel(application: Application) : AndroidViewModel(application) 
         val doc = document.value
         if (!test && doc == null) return null
         val s = if (test) PrintSettings() else settings.value
+        if (!test) {
+            try { PrintPlan.create(requireNotNull(doc).pages, s) }
+            catch (e: IllegalArgumentException) { error.value = e.message; return null }
+        }
         val id = UUID.randomUUID().toString()
         val intent = Intent(app, DirectPrintService::class.java)
             .putExtra("job", id).putExtra("printer", printer.id).putExtra("title", if (test) "Printy test page" else doc?.name)
             .putExtra("file", if (test) null as String? else doc?.file?.path).putExtra("paper", s.paper.name)
             .putExtra("copies", s.copies).putExtra("gray", s.grayscale).putExtra("landscape", s.landscape)
+            .putExtra("selection", s.selection.name).putExtra("pageRange", s.pageRange)
+            .putExtra("layout", s.layout.name).putExtra("reverse", s.reverse)
         return try { ContextCompat.startForegroundService(app, intent); id }
         catch (e: Exception) { error.value = "Printing couldn't start. Keep Printy open and try again."; null }
     }

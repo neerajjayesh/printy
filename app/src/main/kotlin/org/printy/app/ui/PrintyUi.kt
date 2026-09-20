@@ -266,13 +266,21 @@ import org.printy.escp.*
 @Composable private fun PreviewScreen(doc: LocalDocument, printers: List<PrinterProfile>, selected: String?, settings: PrintSettings,
     onSelect: (String) -> Unit, onSettings: (PrintSettings) -> Unit, onPrint: (PrinterProfile) -> Unit, onAdd: () -> Unit,
     jobs: List<JobState>, onCancel: (String) -> Unit, onDismiss: (String) -> Unit) {
-    var page by rememberSaveable(doc.file.path) { mutableIntStateOf(0) }
-    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var previewError by remember { mutableStateOf<String?>(null) }
+    var page by rememberSaveable(doc.file.path, settings.selection, settings.pageRange, settings.layout, settings.reverse) { mutableIntStateOf(0) }
+    val planResult = remember(doc.pages, settings.selection, settings.pageRange, settings.layout, settings.reverse) {
+        runCatching { PrintPlan.create(doc.pages, settings) }
+    }
+    val plan = planResult.getOrNull()
+    val selectionError = planResult.exceptionOrNull()?.message
+    val sheet = plan?.sheets?.getOrNull(page)
+    val previewSettings = settings.copy(copies = 1)
+    // Key the image to its settings so an old preview can never enable a newly changed print.
+    var bitmap by remember(doc, sheet, previewSettings) { mutableStateOf<Bitmap?>(null) }
+    var previewError by remember(doc, sheet, previewSettings) { mutableStateOf<String?>(null) }
     val printer = printers.find { it.id == selected } ?: printers.firstOrNull()
-    LaunchedEffect(doc, page, settings.paper, settings.landscape, settings.grayscale) {
-        bitmap = null; previewError = null
-        try { bitmap = Documents.preview(doc, page, settings) }
+    LaunchedEffect(doc, sheet, previewSettings) {
+        if (sheet == null) return@LaunchedEffect
+        try { bitmap = Documents.preview(doc, sheet, previewSettings) }
         catch (e: CancellationException) { throw e }
         catch (e: Exception) { previewError = PrintErrors.message(e) }
         catch (e: OutOfMemoryError) { previewError = PrintErrors.message(e) }
@@ -284,15 +292,17 @@ import org.printy.escp.*
             Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(24.dp)) {
                 Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 400.dp), contentAlignment = Alignment.Center) {
-                        if (bitmap != null) Image(bitmap!!.asImageBitmap(), "Preview of page ${page + 1}", Modifier.fillMaxWidth().heightIn(max = 400.dp))
+                        if (bitmap != null) Image(bitmap!!.asImageBitmap(), "Sheet ${page + 1}: ${sheet?.description}", Modifier.fillMaxWidth().heightIn(max = 400.dp))
+                        else if (selectionError != null) Text(selectionError, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
                         else if (previewError != null) Text(previewError!!, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
                         else CircularProgressIndicator()
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { page-- }, enabled = page > 0) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Previous page") }
-                        Text("Page ${page + 1} of ${doc.pages}", style = MaterialTheme.typography.labelLarge)
-                        IconButton(onClick = { page++ }, enabled = page < doc.pages - 1) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Next page") }
+                        IconButton(onClick = { page-- }, enabled = plan != null && page > 0) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Previous sheet") }
+                        Text(if (plan == null) "Choose pages to preview" else "Sheet ${page + 1} of ${plan.sheets.size}", style = MaterialTheme.typography.labelLarge)
+                        IconButton(onClick = { page++ }, enabled = plan != null && page < plan.sheets.lastIndex) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Next sheet") }
                     }
+                    sheet?.let { Text(it.description, style = MaterialTheme.typography.bodySmall) }
                 }
             }
         }
@@ -302,6 +312,27 @@ import org.printy.escp.*
         }
         item {
             OutlinedCard { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Choice("Pages to print", PageSelection.entries.map { it.name to it.label }, settings.selection.name) {
+                    onSettings(settings.copy(selection = PageSelection.valueOf(it)))
+                }
+                if (settings.selection == PageSelection.CUSTOM) {
+                    OutlinedTextField(settings.pageRange, { onSettings(settings.copy(pageRange = it.take(2000))) },
+                        label = { Text("Page numbers") }, placeholder = { Text("1, 3–5") }, singleLine = true,
+                        isError = selectionError != null, modifier = Modifier.fillMaxWidth(),
+                        supportingText = { Text(selectionError ?: "${doc.pages} pages in this document. Separate pages with commas.") })
+                }
+                Choice("Layout", SheetLayout.entries.map { it.name to it.label }, settings.layout.name) {
+                    val layout = SheetLayout.valueOf(it)
+                    onSettings(settings.copy(layout = layout, landscape = if (layout == SheetLayout.TWO) true else settings.landscape))
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Reverse page order", style = MaterialTheme.typography.titleSmall)
+                        Text("Print the last selected page first", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(settings.reverse, { onSettings(settings.copy(reverse = it)) })
+                }
+                HorizontalDivider()
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Copies", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                     IconButton(onClick = { onSettings(settings.copy(copies = settings.copies - 1)) }, enabled = settings.copies > 1) { Icon(Icons.Outlined.Remove, "Fewer copies") }
@@ -319,11 +350,16 @@ import org.printy.escp.*
                     FilterChip(settings.landscape, { onSettings(settings.copy(landscape = true)) }, label = { Text("Landscape") })
                 }
                 Text("A small white margin keeps everything on the page.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (settings.layout != SheetLayout.ONE)
+                    Text("Pages go across, then down. Any unused space on the last sheet stays blank.", style = MaterialTheme.typography.bodySmall)
             } }
         }
         item {
-            Button(onClick = { printer?.let(onPrint) }, enabled = printer != null && bitmap != null && jobs.none { it.active && it.title == doc.name }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-                Icon(Icons.Outlined.Print, null); Spacer(Modifier.width(10.dp)); Text("Print ${doc.pages * settings.copies} ${if (doc.pages * settings.copies == 1) "page" else "pages"}")
+            val total = (plan?.sheets?.size ?: 0) * settings.copies
+            plan?.let { Text("${it.selectedPages.size} selected ${if (it.selectedPages.size == 1) "page" else "pages"} · ${settings.copies} ${if (settings.copies == 1) "copy" else "copies"}",
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp)) }
+            Button(onClick = { printer?.let(onPrint) }, enabled = printer != null && plan != null && bitmap != null && jobs.none { it.active && it.title == doc.name }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                Icon(Icons.Outlined.Print, null); Spacer(Modifier.width(10.dp)); Text(if (plan == null) "Choose pages to print" else "Print $total ${if (total == 1) "sheet" else "sheets"}")
             }
         }
         items(jobs.reversed(), key = { it.id }) { JobCard(it, onCancel, onDismiss) }

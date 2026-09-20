@@ -23,6 +23,9 @@ Record printer model/firmware, router model/firmware, USB sharing configuration,
 - [ ] Test whole document, page 2 alone, a noncontiguous range, portrait/landscape, color/gray and copies in the native dialog.
 - [ ] Print a large PDF with bounded memory; rotate the activity during preview and during printing.
 - [ ] Preview and output agree in page fit and margins; full-page native PDF layouts do not receive duplicate margins.
+- [ ] In-app custom ranges, odd/even and reverse order print the indicated original pages.
+- [ ] Two pages appear side by side in landscape; four-page grids follow reading order in both orientations.
+- [ ] Incomplete final sheets leave unused cells blank; copies stay collated and progress counts sheets.
 - [ ] Import photos with EXIF rotations 1–8 and check against Gallery.
 - [ ] Cancellation works before connect, while queued, during rasterization and during a blocked socket write.
 - [ ] Notifications work with permission granted and denied; native Android job state matches outcomes.
@@ -45,8 +48,10 @@ Record printer model/firmware, router model/firmware, USB sharing configuration,
 
 | Printer | Router | Android | Commit | Result / evidence |
 |---|---|---|---|---|
-| L130 | Airtel ZTE ZXHN F670L GPON ONT; firmware not supplied | Not yet supplied | 0.1.0 local debug APK | User reports all test-page text printed, including final two lines, but paper remained partway inside and power light blinked for at least five minutes. Real documents repeatedly stopped around 25%; new submissions started another partial print. Complete job failed; no verified fix yet. |
+| L130 | Airtel ZTE ZXHN F670L GPON ONT; firmware not supplied | Not yet supplied | 0.1.0 local debug APK | User reports all test-page text printed, including final two lines, but paper remained partway inside and power light blinked for at least five minutes. Real documents repeatedly stopped around 25%; new submissions started another partial print. Historical failure. |
+| L130 | Same Airtel ZTE ZXHN F670L setup | Not yet supplied | 0.1.1 / Release 2 | Owner subsequently reports the app works well. Detailed geometry/media checklist and diagnostic output were not supplied. |
+| L130 | Same setup intended | Pending | 0.2.0 / Release 3 | Page selection and multi-page layouts await a physical print check. Transport and encoder unchanged from Release 2. |
 | L120 | Pending | Pending | Pending | Not hardware-validated |
 | L210 | Pending | Pending | Pending | Not hardware-validated |
 
-Version 0.1.1 adds a bottom-of-page marker, corrects `LD`/`JE` ordering, drains replies and waits after output shutdown. These are candidate fixes for the L130 report, not confirmation of its root cause. Install the update over 0.1.0, clear the stalled job with the printer's Stop button, and send one fresh test page. Record whether the bottom marker prints, the sheet ejects and the power light returns to normal, alongside the copied job details. Do not send repeated jobs into an uncleared stalled page.
+Version 0.1.1 adds a bottom-of-page marker, corrects `LD`/`JE` ordering, drains replies and waits after output shutdown. The later successful user report supports continued testing of this setup, but does not isolate the original root cause or certify other models. For Release 3, print a non-sensitive five-page document using two pages per sheet and check the final blank space and sheet ejection, then check a custom range and four-page grid.

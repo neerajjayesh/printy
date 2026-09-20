@@ -74,7 +74,8 @@ class JobController(private val context: Context, private val printers: PrinterS
                 appendLine("Printy ${BuildConfig.VERSION_NAME}")
                 appendLine("Model: ${printer.modelId}; endpoint: ${printer.endpoint}")
                 appendLine("State: ${state.phase}; ${state.message}")
-                appendLine("Page: ${state.page}/${state.total}; elapsed: ${(System.nanoTime() - startedAt) / 1_000_000_000}s")
+                appendLine("Sheet: ${state.page}/${state.total}; elapsed: ${(System.nanoTime() - startedAt) / 1_000_000_000}s")
+                appendLine("Layout: ${settings.layout.label}; selection: ${settings.selection.label}; copies: ${settings.copies}; reverse: ${settings.reverse}")
                 appendLine("Bytes written: ${handle.transport?.bytesWritten ?: 0}")
                 appendLine("Reply bytes read: ${handle.transport?.bytesReceived ?: 0}")
                 appendLine("Page/job ending flushed: ${handle.footerSent}")
@@ -98,7 +99,9 @@ class JobController(private val context: Context, private val printers: PrinterS
                     publish(preparing); onProgress(preparing)
                     owned = prepare()
                     val document = requireNotNull(owned)
-                    val total = document.pages * settings.copies
+                    val plan = try { PrintPlan.create(document.pages, settings) }
+                        catch (e: IllegalArgumentException) { throw UserPrintException(e.message ?: "Choose pages to print.") }
+                    val total = plan.sheets.size * settings.copies
                     attemptedEndpoints.add(printer.endpoint)
                     val jobContext = currentCoroutineContext()
                     val power = context.getSystemService(PowerManager::class.java)
@@ -121,14 +124,20 @@ class JobController(private val context: Context, private val printers: PrinterS
                                 encoder.beginJob()
                                 Documents.renderer(document.file).use { pdf ->
                                     repeat(settings.copies) { copy ->
-                                        repeat(pdf.pageCount) { pageIndex ->
+                                        plan.sheets.forEachIndexed { sheetIndex, sheet ->
                                             ensureActive()
-                                            val number = copy * pdf.pageCount + pageIndex + 1
+                                            val number = copy * plan.sheets.size + sheetIndex + 1
                                             val state = initial.copy(phase = JobPhase.SENDING, page = number, total = total,
-                                                progress = (number - 1).toFloat() / total, message = "Sending page $number of $total…")
+                                                progress = (number - 1).toFloat() / total, message = "Sending sheet $number of $total…")
                                             withContext(Dispatchers.Main) { publish(state); onProgress(state) }
-                                            pdf.openPage(pageIndex).use { page ->
-                                                Documents.PageRaster(page, spec, settings).use { raster ->
+                                            if (settings.layout == SheetLayout.ONE) {
+                                                pdf.openPage(requireNotNull(sheet.pages.single())).use { page ->
+                                                    Documents.PageRaster(page, spec, settings).use { raster ->
+                                                        encoder.page(raster, spec) { jobContext.ensureActive() }
+                                                    }
+                                                }
+                                            } else {
+                                                Documents.SheetRaster(pdf, sheet, spec, settings).use { raster ->
                                                     encoder.page(raster, spec) { jobContext.ensureActive() }
                                                 }
                                             }
