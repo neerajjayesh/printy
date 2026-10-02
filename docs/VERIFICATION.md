@@ -1,5 +1,25 @@
 # Verification
 
+## Release 4 — 0.2.1
+
+This update responds to the user's OnePlus 13s screen-off interruption report. It uses standard Android APIs for the screen safeguard and a user-approved battery exemption. The encoder, page layouts and transport are unchanged.
+
+- Local app and instrumentation APKs built successfully; all 33 JVM tests passed (13 encoder, 20 app).
+- Android lint: zero errors, eight dependency-update suggestions and one `BatteryLife` warning for the direct battery-exemption request. The permission is intentionally user-triggered to address the reported failure of core local printing; any future Play Store submission must assess the acceptable-use requirements. The warning is not suppressed.
+- Added Android tests exercise the real activity and queue: protection across recreation; clearing after cancellation; clearing after failure while the activity is stopped; and retaining protection until the last queued job ends.
+- Emulator execution: all 9 tests passed on Android API 35 (3 screen/queue lifecycle tests and 6 PDF rendering tests). All three jobs in the [CI run](https://github.com/neerajjayesh/printy/actions/runs/36982409575) passed for source commit `81af9eabd7b14843a96261a39d1ff29e235e6d95`; subsequent release edits contain verification documentation only.
+- APK version is `0.2.1` (4); signature scheme v2 verified with the same certificate as previous release APKs.
+
+Local command is the same full build/test/lint command below, using JDK 21 and the pinned Gradle 8.11.1; `BUILD SUCCESSFUL`. Log: `.tools/power-build.log`.
+
+Binary `dist/printy-0.2.1-debug.apk`: 10,576,322 bytes. SHA-256:
+
+```text
+2fb829362fdc5fffb282aac89fd30b6889045fc88f16ce3b72e8d5dcc36d035f
+```
+
+Physical printing with manual lock, forced Doze network delivery and manufacturer-specific battery management have **not** been validated on the OnePlus 13s or every phone. The deterministic fallback is keeping Printy visible: it prevents automatic timeout during an active job. It does not bypass manual lock or keep other apps' screens on. The user-approved Android exemption enables network/CPU access under Android's documented Doze rules; manufacturer restrictions can still differ.
+
 ## Release 3 — 0.2.0
 
 This build adds page selection and sheet layouts. The ESC/P2 encoder and socket transport are unchanged from Release 2.
