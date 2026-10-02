@@ -80,6 +80,7 @@ class JobController(private val context: Context, private val printers: PrinterS
                 appendLine("Reply bytes read: ${handle.transport?.bytesReceived ?: 0}")
                 appendLine("Page/job ending flushed: ${handle.footerSent}")
                 appendLine("Connection finish: ${handle.finishResult}")
+                appendLine(PrintPower.diagnostics(context))
                 append("These details cannot confirm physical printing or paper ejection.")
             }
             val monitor = launch {

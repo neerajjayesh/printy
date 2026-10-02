@@ -1,5 +1,15 @@
 # Changelog
 
+## Release 4 — 0.2.1
+
+- Prevent automatic screen timeout while Printy is visible and any job is queued, preparing, sending or finishing the connection. Restore normal timeout after the queue ends, including cancellation and failure.
+- Keep the safeguard independent of job-card visibility and preserve it across activity recreation.
+- Add **Allow background printing** in the home screen and preview. This requests Android's battery-optimization exemption only after a tap and system approval, with an app-settings fallback.
+- Refresh the displayed allowance after returning from Settings, and include power state in copied job diagnostics.
+- Retain the existing foreground print service and CPU wake lock. Manual locking and switching apps remain available; manufacturer-specific background restrictions may still require Unrestricted battery use.
+
+The timeout safeguard uses standard Android APIs across supported phones. Locked-screen printing on the reported OnePlus 13s still needs a physical test; this release does not claim to override every manufacturer's battery policy.
+
 ## Release 3 — 0.2.0
 
 - Choose all pages, custom lists/ranges, odd pages or even pages. Invalid selections explain how to correct them before printing.

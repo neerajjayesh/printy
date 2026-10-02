@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.awaitCancellation
 import org.printy.app.data.*
 import org.printy.app.BuildConfig
 import org.printy.app.printing.*
@@ -97,6 +98,8 @@ import org.printy.escp.*
             Column(Modifier.widthIn(max = 760.dp).fillMaxSize()) {
                 if (importing) LinearProgressIndicator(Modifier.fillMaxWidth())
                 if (error != null) ErrorCard(error!!, { vm.error.value = null })
+                if (jobs.any { it.active }) Text("Screen stays on while Printy is open and sending. You can still lock it manually.",
+                    Modifier.padding(horizontal = 24.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall)
                 when {
                     !ready -> Onboarding(printers, jobs, onSave = { vm.app.printers.save(it) },
                         onTest = { p, callback -> print { callback(vm.print(p, true)) } }, onDone = vm::finishOnboarding, onEnable = ::enable,
@@ -144,6 +147,7 @@ import org.printy.escp.*
             Text("PDFs & photos", Modifier.fillMaxWidth().padding(top = 8.dp), style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        item { PrintPowerCard() }
         items(jobs.reversed(), key = { it.id }) { JobCard(it, onCancel, onDismiss) }
         item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Your printers", style = MaterialTheme.typography.titleLarge)
@@ -310,6 +314,7 @@ import org.printy.escp.*
             if (printer == null) OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text("Add a printer to continue") }
             else Choice("Send to", printers.map { it.id to it.name }, printer.id, onSelect)
         }
+        item { PrintPowerCard() }
         item {
             OutlinedCard { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Choice("Pages to print", PageSelection.entries.map { it.name to it.label }, settings.selection.name) {
@@ -363,6 +368,33 @@ import org.printy.escp.*
             }
         }
         items(jobs.reversed(), key = { it.id }) { JobCard(it, onCancel, onDismiss) }
+    }
+}
+
+@Composable private fun PrintPowerCard() {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current
+    var allowed by remember { mutableStateOf(PrintPower.backgroundAllowed(context)) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(lifecycle) {
+        lifecycle.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            allowed = PrintPower.backgroundAllowed(context)
+            awaitCancellation()
+        }
+    }
+    OutlinedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Printing with the screen off", style = MaterialTheme.typography.titleSmall)
+            Text(if (allowed) "Android's background allowance is enabled. If your phone still pauses printing, check that Printy's battery use is set to Unrestricted."
+                else "To print while locked, allow Printy to keep sending in the background. Android will ask for your approval. Otherwise, leave Printy open; the screen will stay on while sending.",
+                style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = {
+                error = null
+                try { PrintPower.openSettings(context) }
+                catch (_: Exception) { error = "Open Android Settings → Apps → Printy → Battery and allow background use." }
+            }) { Text(if (allowed) "Open app battery settings" else "Allow background printing") }
+            error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        }
     }
 }
 

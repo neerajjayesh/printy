@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/neerajjayesh/printy/releases/tag/v0.2.0"><img alt="Release 3 · v0.2.0" src="https://img.shields.io/badge/Release_3-v0.2.0-24634C?style=flat-square"></a>
+  <a href="https://github.com/neerajjayesh/printy/releases/tag/v0.2.1"><img alt="Release 4 · v0.2.1" src="https://img.shields.io/badge/Release_4-v0.2.1-24634C?style=flat-square"></a>
   <img alt="Android 8.0 and newer" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white">
   <img alt="Kotlin and Jetpack Compose" src="https://img.shields.io/badge/Kotlin-Jetpack_Compose-7F52FF?style=flat-square&logo=kotlin&logoColor=white">
   <a href="LICENSE"><img alt="GPL v2 or later" src="https://img.shields.io/badge/License-GPL--2.0--or--later-blue?style=flat-square"></a>
@@ -14,7 +14,7 @@
 Free, open-source Android printing for Epson inkjets connected to a router's USB print server.</p>
 
 <p align="center">
-  <a href="https://github.com/neerajjayesh/printy/releases/tag/v0.2.0"><strong>Download Release 3</strong></a> ·
+  <a href="https://github.com/neerajjayesh/printy/releases/tag/v0.2.1"><strong>Download Release 4</strong></a> ·
   <a href="#get-started">Get started</a> ·
   <a href="#build-it-yourself">Build from source</a> ·
   <a href="docs/HARDWARE_VALIDATION.md">Hardware testing</a>
@@ -33,11 +33,12 @@ No accounts. No ads. No analytics. No watermarks. No paid unlocks.
 
 | Release | Version | What it contains | Status |
 | --- | --- | --- | --- |
-| **[Release 3](https://github.com/neerajjayesh/printy/releases/tag/v0.2.0)** | `0.2.0` | Page ranges, odd/even selection, reverse order, 1/2/4 pages per sheet and sheet previews | Current experimental build |
+| **[Release 4](https://github.com/neerajjayesh/printy/releases/tag/v0.2.1)** | `0.2.1` | Keep screen on while printing; user-approved background printing allowance | Current experimental build |
+| [Release 3](https://github.com/neerajjayesh/printy/releases/tag/v0.2.0) | `0.2.0` | Page ranges, odd/even selection, reverse order, 1/2/4 pages per sheet and sheet previews | Previous layout update |
 | [Release 2](https://github.com/neerajjayesh/printy/releases/tag/v0.1.1) | `0.1.1` | Improved connection completion, corrected footer, copyable job details, bottom-of-page test marker | User reports working on L130/F670L |
 | [Release 1](https://github.com/neerajjayesh/printy/releases/tag/v0.1.0) | `0.1.0` | Initial Android app, Print Service and standalone ESC/P2 encoder | Historical build with reported stalls |
 
-Each release includes an **APK**, a **SHA-256 checksum**, and a tagged source snapshot. These APKs are **debug-signed development builds**, not production-signed store releases. The three downloads use the same certificate and application ID, so updates preserve saved printers.
+Each release includes an **APK**, a **SHA-256 checksum**, and a tagged source snapshot. These APKs are **debug-signed development builds**, not production-signed store releases. The downloads use the same certificate and application ID, so updates preserve saved printers.
 
 See the [changelog](CHANGELOG.md) and [verification notes](docs/VERIFICATION.md) for the differences and completed checks.
 
@@ -54,6 +55,7 @@ See the [changelog](CHANGELOG.md) and [verification notes](docs/VERIFICATION.md)
 | Save several printers | Name, numeric IPv4/IPv6 address, port, exact model and last-used time |
 | Check a new setup | Three-step onboarding and a one-page test print |
 | Follow a job | In-app progress, notifications, cancel and copyable job details |
+| Avoid screen-timeout stalls | Keep Printy visible to keep the screen on during an active job; optional Android background allowance |
 | Make it your own | Kotlin, Jetpack Compose, Material 3 dynamic color and a reusable JVM encoder |
 
 ## Printer and router compatibility
@@ -75,7 +77,7 @@ The model selects the command format and physical ink-head geometry. A router's 
 
 ## Get started
 
-1. Download the APK from **[Release 3](https://github.com/neerajjayesh/printy/releases/tag/v0.2.0)** and install it on your Android device.
+1. Download the APK from **[Release 4](https://github.com/neerajjayesh/printy/releases/tag/v0.2.1)** and install it on your Android device.
 2. Connect the printer to your router's USB port and enable printer sharing in the router's settings.
 3. Open Printy. Enter the router's local IP address, select the **exact printer model**, and use port **9100** unless your print server specifies another port.
 4. Load plain A4 paper and send **one test page**. Check the text, four colors, bottom marker and complete sheet ejection before printing a document.
@@ -94,6 +96,14 @@ In **Print a file**, open a PDF and scroll to the options:
 4. Choose copies, paper and color, then tap **Print … sheets**. Copies are collated; progress counts physical sheets.
 
 These layout controls are in Printy's own file preview. Android's native print dialog keeps its own page controls, and Printy honors the PDF subset supplied by the spooler. This release provides single-sided layouts, without booklet reordering or automatic duplex printing.
+
+### If printing pauses when the screen turns off
+
+Release 4 keeps the screen on automatically **while Printy is visible and any job is active**, including preparation, queued jobs and the connection-finishing wait. Normal timeout returns after the queue finishes, fails or is canceled. Dismissing a progress card does not remove this protection. This uses Android's standard [keep-screen-on flag](https://developer.android.com/develop/background-work/background-tasks/awake/screen-on) across supported phones.
+
+For printing while manually locked or while using another app, tap **Allow background printing** on the home screen or preview **before starting the job**, then approve Android's request. If your phone still pauses, use **Open app battery settings** and set Printy's battery/background use to **Unrestricted** (the name varies by phone). The app refreshes the allowance status when you return.
+
+The existing foreground service and CPU wake lock do not override [Android Doze network restrictions](https://developer.android.com/training/monitoring-device-state/doze-standby). The requested exemption addresses those restrictions, but manufacturer policies still vary. Manual lock always remains possible. Keeping Printy visible is the fallback that avoids automatic timeout; no universal locked-screen guarantee is made. The OnePlus 13s report prompted this change; physical verification remains pending. Screen protection ends when transmission/connection finishing ends, since the router cannot confirm paper completion.
 
 ### If a job stops partway through
 

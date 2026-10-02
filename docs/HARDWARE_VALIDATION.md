@@ -19,6 +19,9 @@ Record printer model/firmware, router model/firmware, USB sharing configuration,
 
 ## Android integration
 
+- [ ] With Release 4, start a long job and leave Printy visible past the phone's timeout; screen stays on until the queue ends. Check success, failure and cancel restore normal timeout.
+- [ ] Approve **Allow background printing**, then test manual lock on the OnePlus 13s and other manufacturers. Record Android version and battery settings; verify complete output and ejection.
+- [ ] Deny the allowance and confirm printing still works with Printy open and that manual locking remains possible.
 - [ ] Enable service and discover saved profiles from Chrome, Docs, Photos/Gallery and Files.
 - [ ] Test whole document, page 2 alone, a noncontiguous range, portrait/landscape, color/gray and copies in the native dialog.
 - [ ] Print a large PDF with bounded memory; rotate the activity during preview and during printing.
